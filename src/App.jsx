@@ -29,6 +29,7 @@ const T = {
     grocery: "MATAFFÄR",
     pharmacy: "APOTEK",
     sightseeing: "SEVÄRDHETER",
+    loading: "Laddar produkter...",
   },
   en: {
     badge: "DIGITAL GUEST GUIDE",
@@ -55,6 +56,7 @@ const T = {
     grocery: "GROCERY",
     pharmacy: "PHARMACY",
     sightseeing: "SIGHTSEEING",
+    loading: "Loading products...",
   },
   de: {
     badge: "DIGITALER GÄSTEFÜHRER",
@@ -81,6 +83,7 @@ const T = {
     grocery: "SUPERMARKT",
     pharmacy: "APOTHEKE",
     sightseeing: "SEHENSWÜRDIGKEITEN",
+    loading: "Produkte werden geladen...",
   },
 };
 
@@ -230,19 +233,28 @@ const GOOGLE_SHEET_CSV_URL = "";
 // Lämna "" för att använda reservlistan nedan istället.
 
 // Reservlista — används om Google Sheet-länken är tom eller inte kan laddas
+// Använd objekt-format för name så du kan ha översättningar: { sv: "...", en: "...", de: "..." }
+// Eller en sträng om produkten heter samma på alla språk (t.ex. "Coca-Cola", "Red Bull")
 const FALLBACK_ITEMS = [
-  { id: 1,  name: "Coca-Cola",      price: 16, emoji: "🥤", cat: "drink" },
-  { id: 2,  name: "Pepsi",          price: 16, emoji: "🥤", cat: "drink" },
-  { id: 3,  name: "Red Bull",       price: 26, emoji: "⚡", cat: "drink" },
-  { id: 4,  name: "Ramlösa",        price: 16, emoji: "💧", cat: "drink" },
-  { id: 5,  name: "Loka",           price: 16, emoji: "💧", cat: "drink" },
-  { id: 6,  name: "Lättöl",         price: 35, emoji: "🍺", cat: "drink" },
-  { id: 7,  name: "Juice",          price: 20, emoji: "🧃", cat: "drink" },
-  { id: 8,  name: "Kex Choklad",    price: 25, emoji: "🍫", cat: "snack" },
-  { id: 9,  name: "Marabou",        price: 30, emoji: "🍫", cat: "snack" },
-  { id: 10, name: "Nötmix",         price: 25, emoji: "🥜", cat: "snack" },
-  { id: 11, name: "Handduksset",    price: 75, emoji: "🛁", cat: "extra" },
+  { id: 1,  name: { sv: "Läsk",          en: "Soft drink",     de: "Softdrink" },        price: 16, emoji: "🥤", cat: "drink" },
+  { id: 2,  name: { sv: "Bubbelvatten",  en: "Sparkling water", de: "Sprudelwasser" },   price: 16, emoji: "💧", cat: "drink" },
+  { id: 3,  name: { sv: "Stilla vatten", en: "Still water",    de: "Stilles Wasser" },   price: 16, emoji: "💧", cat: "drink" },
+  { id: 4,  name: "Red Bull",                                                            price: 26, emoji: "⚡", cat: "drink" },
+  { id: 5,  name: { sv: "Lättöl",        en: "Light beer",     de: "Leichtbier" },       price: 35, emoji: "🍺", cat: "drink" },
+  { id: 6,  name: { sv: "Juice",         en: "Juice",          de: "Saft" },             price: 20, emoji: "🧃", cat: "drink" },
+  { id: 7,  name: { sv: "Kex Choklad",   en: "Chocolate wafer", de: "Schokowaffel" },    price: 25, emoji: "🍫", cat: "snack" },
+  { id: 8,  name: { sv: "Choklad",       en: "Chocolate bar",  de: "Schokolade" },       price: 30, emoji: "🍫", cat: "snack" },
+  { id: 9,  name: { sv: "Nötmix",        en: "Nut mix",        de: "Nussmix" },          price: 25, emoji: "🥜", cat: "snack" },
+  { id: 10, name: { sv: "Chips",         en: "Chips",          de: "Chips" },            price: 30, emoji: "🥨", cat: "snack" },
+  { id: 11, name: { sv: "Handduksset",   en: "Towel set",      de: "Handtuch-Set" },     price: 75, emoji: "🛁", cat: "extra" },
 ];
+
+// Hjälpfunktion: hämtar rätt språk-version av produktnamnet
+function getName(name, lang) {
+  if (typeof name === "string") return name;
+  if (typeof name === "object" && name) return name[lang] || name.en || name.sv || "";
+  return "";
+}
 
 function parseCSV(csv) {
   const lines = csv.trim().split("\n");
@@ -252,14 +264,22 @@ function parseCSV(csv) {
     const vals = line.split(",").map(v => v.trim().replace(/['"]/g, ""));
     const row = {};
     headers.forEach((h, j) => { row[h] = vals[j] || ""; });
+    // Stöd för flerspråkiga kolumner i Google Sheets: name_sv, name_en, name_de
+    const hasMultiLang = row.name_sv || row.name_en || row.name_de;
+    const name = hasMultiLang
+      ? { sv: row.name_sv || row.name || "", en: row.name_en || row.name || "", de: row.name_de || row.name || "" }
+      : (row.name || "");
     return {
       id: i + 1,
-      name: row.name || "",
+      name,
       price: parseInt(row.price) || 0,
       emoji: row.emoji || "📦",
       cat: (row.category || "extra").toLowerCase(),
     };
-  }).filter(item => item.name && item.price > 0);
+  }).filter(item => {
+    const n = typeof item.name === "string" ? item.name : (item.name.sv || item.name.en);
+    return n && item.price > 0;
+  });
 }
 
 const REVOLUT_URL = "https://revolut.me/endritttt6";
@@ -273,12 +293,12 @@ function Reveal({ children, delay = 0 }) {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVis(true); obs.disconnect(); } }, { threshold: 0.08 });
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVis(true); obs.disconnect(); } }, { threshold: 0.05, rootMargin: "0px 0px -40px 0px" });
     obs.observe(el);
     return () => obs.disconnect();
   }, []);
   return (
-    <div ref={ref} style={{ opacity: vis ? 1 : 0, transform: vis ? "translateY(0)" : "translateY(28px)", transition: `opacity 0.8s ${delay}s cubic-bezier(.22,1,.36,1), transform 0.8s ${delay}s cubic-bezier(.22,1,.36,1)` }}>
+    <div ref={ref} style={{ opacity: vis ? 1 : 0, transform: vis ? "translateY(0)" : "translateY(20px)", transition: `opacity 0.7s ${delay}s cubic-bezier(.22,1,.36,1), transform 0.7s ${delay}s cubic-bezier(.22,1,.36,1)`, willChange: "opacity, transform" }}>
       {children}
     </div>
   );
@@ -361,7 +381,7 @@ function Shop({ lang, dark }) {
   const count = Object.values(cart).reduce((s, q) => s + q, 0);
   const add = id => setCart(c => ({ ...c, [id]: (c[id] || 0) + 1 }));
   const rem = id => setCart(c => { const n = { ...c }; if (n[id] > 1) n[id]--; else delete n[id]; return n; });
-  const summary = Object.entries(cart).map(([id, q]) => { const it = items.find(i => i.id === +id); return `${q}x ${it.name}`; }).join(", ");
+  const summary = Object.entries(cart).map(([id, q]) => { const it = items.find(i => i.id === +id); return `${q}x ${getName(it.name, lang)}`; }).join(", ");
 
   const catLabel = { drink: t.drinks, snack: t.snacks, extra: t.extras };
   const bg = dark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)";
@@ -375,7 +395,7 @@ function Shop({ lang, dark }) {
     <div>
       <p style={{ margin: "0 0 18px", fontSize: 13, color: sub, lineHeight: 1.6 }}>{t.shopDesc}</p>
       {loading ? (
-        <div style={{ textAlign: "center", padding: "24px 0", color: sub, fontSize: 13 }}>Laddar produkter...</div>
+        <div style={{ textAlign: "center", padding: "24px 0", color: sub, fontSize: 13 }}>{t.loading}</div>
       ) : ["drink", "snack", "extra"].map(cat => {
         const catItems = items.filter(i => i.cat === cat);
         if (!catItems.length) return null;
@@ -395,7 +415,7 @@ function Shop({ lang, dark }) {
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
                       <span style={{ fontSize: 20, flexShrink: 0 }}>{item.emoji}</span>
-                      <span style={{ fontSize: 14, fontWeight: 500, color: txt, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
+                      <span style={{ fontSize: 14, fontWeight: 500, color: txt, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getName(item.name, lang)}</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: "#b08d57", minWidth: 40, textAlign: "right" }}>{item.price}kr</span>
@@ -494,19 +514,34 @@ export default function GuestGuide() {
     <div style={{ minHeight: "100vh", background: pageBg, fontFamily: "'Outfit',sans-serif", color: txt, overflowX: "hidden", WebkitFontSmoothing: "antialiased", transition: "background 0.5s, color 0.5s" }}>
       <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
       <style>{`
+        html{scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
+        body{scroll-behavior:smooth;overscroll-behavior:none}
         *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
         a:active,button:active{transform:scale(0.97)!important}
         input[type="checkbox"]{accent-color:#b08d57;width:18px;height:18px;cursor:pointer}
-        .copy-btn{padding:6px 14px;font-size:11px;font-weight:700;font-family:'Outfit',sans-serif;color:#b08d57;background:transparent;border:1.5px solid rgba(176,141,87,0.35);border-radius:8px;cursor:pointer;transition:all 0.3s;letter-spacing:0.8px}
+        .copy-btn{padding:6px 14px;font-size:11px;font-weight:700;font-family:'Outfit',sans-serif;color:#b08d57;background:transparent;border:1.5px solid rgba(176,141,87,0.35);border-radius:8px;cursor:pointer;transition:all 0.3s cubic-bezier(.22,1,.36,1);letter-spacing:0.8px}
         .copy-btn[data-copied="true"]{color:#fff;background:#b08d57;border-color:#b08d57}
-        .shop-add-btn{width:32px;height:32px;border-radius:9px;border:1.5px solid rgba(176,141,87,0.25);background:transparent;color:#b08d57;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;line-height:1}
-        .shop-qty-btn{width:28px;height:28px;border-radius:7px;border:1px solid rgba(176,141,87,0.2);background:transparent;color:#b08d57;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif}
+        .copy-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(176,141,87,0.2)}
+        .shop-add-btn{width:32px;height:32px;border-radius:9px;border:1.5px solid rgba(176,141,87,0.25);background:transparent;color:#b08d57;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;line-height:1;transition:all 0.25s cubic-bezier(.22,1,.36,1)}
+        .shop-add-btn:hover{background:rgba(176,141,87,0.08);transform:scale(1.05)}
+        .shop-qty-btn{width:28px;height:28px;border-radius:7px;border:1px solid rgba(176,141,87,0.2);background:transparent;color:#b08d57;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;transition:all 0.2s}
         .shop-qty-btn-fill{background:rgba(176,141,87,0.12)}
-        .cart-bar{margin-top:6px;padding:18px;border-radius:16px;background:linear-gradient(145deg,#b08d57 0%,#8a6d3b 100%);box-shadow:0 8px 32px rgba(176,141,87,0.25);animation:fadeUp 0.4s cubic-bezier(.22,1,.36,1)}
-        .revolut-btn{display:flex;align-items:center;justify-content:center;padding:15px;border-radius:12px;background:#fff;color:#1a1a1a;font-size:15px;font-weight:800;text-decoration:none;font-family:'Outfit',sans-serif;transition:transform 0.2s}
-        .lang-btn{padding:6px 12px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.3s;border:1.5px solid transparent;letter-spacing:0.5px}
-        .theme-toggle{width:40px;height:40px;border-radius:12px;border:1.5px solid rgba(176,141,87,0.2);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:all 0.3s}
-        @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        .cart-bar{margin-top:6px;padding:18px;border-radius:16px;background:linear-gradient(145deg,#b08d57 0%,#8a6d3b 100%);box-shadow:0 8px 32px rgba(176,141,87,0.25);animation:fadeUp 0.5s cubic-bezier(.22,1,.36,1)}
+        .revolut-btn{display:flex;align-items:center;justify-content:center;padding:15px;border-radius:12px;background:#fff;color:#1a1a1a;font-size:15px;font-weight:800;text-decoration:none;font-family:'Outfit',sans-serif;transition:all 0.25s cubic-bezier(.22,1,.36,1);box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+        .revolut-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,0.25)}
+        .lang-btn{padding:6px 12px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.3s cubic-bezier(.22,1,.36,1);border:1.5px solid transparent;letter-spacing:0.5px}
+        .theme-toggle{width:40px;height:40px;border-radius:12px;border:1.5px solid rgba(176,141,87,0.2);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:all 0.4s cubic-bezier(.22,1,.36,1)}
+        .theme-toggle:hover{transform:rotate(15deg)}
+        .section-card{transition:background 0.4s cubic-bezier(.22,1,.36,1),border 0.4s cubic-bezier(.22,1,.36,1),transform 0.3s cubic-bezier(.22,1,.36,1),box-shadow 0.3s cubic-bezier(.22,1,.36,1)}
+        .section-card:hover{transform:translateY(-1px)}
+        .quick-action{transition:all 0.25s cubic-bezier(.22,1,.36,1)}
+        .quick-action:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,0.08)}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+        @media (prefers-reduced-motion:reduce){
+          html,body{scroll-behavior:auto}
+          *{animation-duration:0.01ms!important;transition-duration:0.01ms!important}
+        }
       `}</style>
 
       {/* ── HERO ── */}
@@ -589,11 +624,11 @@ export default function GuestGuide() {
               { href: "https://maps.google.com/?q=Spelmansgatan+18+Malmö", icon: "⊹", label: t.map, tgt: "_blank" },
               { href: "tel:112", icon: "⚠", label: "112", em: true },
             ].map((a, i) => (
-              <a key={i} href={a.href} target={a.tgt} rel="noreferrer" style={{
+              <a key={i} href={a.href} target={a.tgt} rel="noreferrer" className="quick-action" style={{
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
                 padding: "16px 4px", borderRadius: 14,
                 background: a.em ? emBg : cardBg, border: `1px solid ${a.em ? emBorder : cardBorder}`,
-                textDecoration: "none", color: txt, transition: "all 0.2s",
+                textDecoration: "none", color: txt,
               }}>
                 <span style={{ fontSize: 20, lineHeight: 1 }}>{a.icon}</span>
                 <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5 }}>{a.label}</span>
@@ -607,8 +642,8 @@ export default function GuestGuide() {
       <main style={{ padding: "24px 16px", display: "flex", flexDirection: "column", gap: 10, maxWidth: 560, margin: "0 auto" }}>
         {sections.map((sec, i) => (
           <Reveal key={sec.id} delay={0.06 * i}>
-            <div style={{
-              borderRadius: 16, overflow: "hidden", transition: "all 0.4s",
+            <div className="section-card" style={{
+              borderRadius: 16, overflow: "hidden",
               background: open === sec.id ? cardBgOpen : cardBg,
               border: `1px solid ${open === sec.id ? cardBorderOpen : cardBorder}`,
             }}>
@@ -759,3 +794,4 @@ export default function GuestGuide() {
     </div>
   );
 }
+
