@@ -30,6 +30,7 @@ const T = {
     pharmacy: "APOTEK",
     sightseeing: "SEVÄRDHETER",
     loading: "Laddar produkter...",
+    getDirections: "Vägbeskrivning",
   },
   en: {
     badge: "DIGITAL GUEST GUIDE",
@@ -57,6 +58,7 @@ const T = {
     pharmacy: "PHARMACY",
     sightseeing: "SIGHTSEEING",
     loading: "Loading products...",
+    getDirections: "Directions",
   },
   de: {
     badge: "DIGITALER GÄSTEFÜHRER",
@@ -84,6 +86,7 @@ const T = {
     pharmacy: "APOTHEKE",
     sightseeing: "SEHENSWÜRDIGKEITEN",
     loading: "Produkte werden geladen...",
+    getDirections: "Wegbeschreibung",
   },
 };
 
@@ -536,6 +539,8 @@ export default function GuestGuide() {
         .section-card:hover{transform:translateY(-1px)}
         .quick-action{transition:all 0.25s cubic-bezier(.22,1,.36,1)}
         .quick-action:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,0.08)}
+        .place-card{transition:all 0.25s cubic-bezier(.22,1,.36,1)}
+        .place-card:hover{transform:translateY(-1px);border-color:rgba(176,141,87,0.3)!important;box-shadow:0 4px 12px rgba(0,0,0,0.06)}
         @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
         @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
         @media (prefers-reduced-motion:reduce){
@@ -727,16 +732,27 @@ export default function GuestGuide() {
 
                   {sec.id === "local" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {(LOCAL[lang] || LOCAL.en).map((p, j) => (
-                        <div key={j} style={{ padding: "14px 16px", borderRadius: 10, background: cardBg, border: `1px solid ${cardBorder}`, display: "flex", flexDirection: "column", gap: 4 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ fontSize: 14, fontWeight: 600, color: txt }}>{p.name}</span>
-                            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: accent, background: "rgba(176,141,87,0.08)", padding: "3px 9px", borderRadius: 5 }}>{typeLabel(p.type)}</span>
-                          </div>
-                          <span style={{ fontSize: 13, color: txtSub, lineHeight: 1.5 }}>{p.note}</span>
-                          <span style={{ fontSize: 12, color: txtFaint }}>🚗 {p.dist}</span>
-                        </div>
-                      ))}
+                      {(LOCAL[lang] || LOCAL.en).map((p, j) => {
+                        const query = encodeURIComponent(`${p.name}, Malmö, Sweden`);
+                        const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${query}&travelmode=driving`;
+                        return (
+                          <a key={j} href={mapsUrl} target="_blank" rel="noreferrer" className="place-card" style={{
+                            padding: "14px 16px", borderRadius: 10, background: cardBg, border: `1px solid ${cardBorder}`,
+                            display: "flex", flexDirection: "column", gap: 4,
+                            textDecoration: "none", color: "inherit", cursor: "pointer",
+                          }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                              <span style={{ fontSize: 14, fontWeight: 600, color: txt }}>{p.name}</span>
+                              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: accent, background: "rgba(176,141,87,0.08)", padding: "3px 9px", borderRadius: 5, flexShrink: 0 }}>{typeLabel(p.type)}</span>
+                            </div>
+                            <span style={{ fontSize: 13, color: txtSub, lineHeight: 1.5 }}>{p.note}</span>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 2 }}>
+                              <span style={{ fontSize: 12, color: txtFaint }}>🚗 {p.dist}</span>
+                              <span style={{ fontSize: 11, color: accent, fontWeight: 600, letterSpacing: 0.5 }}>{t.getDirections} →</span>
+                            </div>
+                          </a>
+                        );
+                      })}
                     </div>
                   )}
 
