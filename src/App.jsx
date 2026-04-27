@@ -163,9 +163,9 @@ const CHECKOUT = {
 };
 
 const KEY_INFO = {
-  sv: "Koden till nyckelboxen är 6845. Vrid på handtaget efter för att hämta nyckeln.",
-  en: "The key box code is 6845. Turn the handle afterwards to retrieve the key.",
-  de: "Der Code der Schlüsselbox ist 6845. Drehen Sie danach den Griff, um den Schlüssel zu entnehmen.",
+  sv: "Kod till nyckelboxen skickas dagen innan ankomst tillsammans med incheckningsinstruktionerna. Vrid handtaget efter att du har angett koden för att ta ut nyckeln.",
+  en: "The key box code will be provided the day before arrival together with the check-in instructions. Turn the handle afterwards to retrieve the key.",
+  de: "Der Code für die Schlüsselbox wird am Tag vor der Ankunft zusammen mit den Check-in-Anweisungen bereitgestellt. Drehen Sie anschließend den Griff, um den Schlüssel zu entnehmen.",
 };
 
 const LOCAL = {
